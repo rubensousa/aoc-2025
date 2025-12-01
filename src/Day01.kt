@@ -4,7 +4,7 @@ object Day01 {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val testInput = readText("day01.txt") // 6412 -> too low
+        val testInput = readText("day01.txt")
         val rotations = parseRotations(testInput)
         part1(rotations).printObject()
         part2(rotations).printObject()
