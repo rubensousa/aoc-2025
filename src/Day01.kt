@@ -6,8 +6,8 @@ object Day01 {
     fun main(args: Array<String>) {
         val testInput = readText("day01.txt")
         val rotations = parseRotations(testInput)
-        part1(rotations).printObject()
-        part2(rotations).printObject()
+        part1(rotations).printObject() // 1078
+        part2(rotations).printObject() // 6412
     }
 
     private fun parseRotations(values: List<String>): List<Rotation> {
@@ -34,6 +34,27 @@ object Day01 {
     }
 
     fun part2(rotations: List<Rotation>): Int {
+        var currentValue = 50
+        var count = 0
+        rotations.forEach { rotation ->
+            val fullRevolutions = abs(rotation.getRelativeValue()) / 100
+            count += fullRevolutions
+            val nextValue = rotation.applyTo(currentValue)
+            if (currentValue != 0) {
+                if (nextValue == 0) {
+                    count++
+                } else if (nextValue > currentValue && rotation is Rotation.Left) {
+                    count++
+                } else if (nextValue < currentValue && rotation is Rotation.Right) {
+                    count++
+                }
+            }
+            currentValue = nextValue
+        }
+        return count
+    }
+
+    fun part2NonOptimal(rotations: List<Rotation>): Int {
         var currentValue = 50
         var count = 0
         rotations.forEach { rotation ->
