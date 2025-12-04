@@ -13,10 +13,9 @@ object Day04 {
         for (y in 0 until grid.rows) {
             for (x in 0 until grid.columns) {
                 val point = Point(x = x, y = y)
-                val value = grid.getValueAt(point)
-                if (value == '@') {
+                if (grid.isRollOfPaper(point)) {
                     val adjacent = Direction.entries.count { nextDirection ->
-                        grid.getValueAt(point.move(nextDirection)) == '@'
+                        grid.isRollOfPaper(point.move(nextDirection))
                     }
                     if (adjacent < 4) {
                         sum++
@@ -34,10 +33,9 @@ object Day04 {
             for (y in 0 until grid.rows) {
                 for (x in 0 until grid.columns) {
                     val point = Point(x = x, y = y)
-                    val value = grid.getValueAt(point)
-                    if (value == '@') {
+                    if (grid.isRollOfPaper(point)) {
                         val adjacent = Direction.entries.count { nextDirection ->
-                            grid.getValueAt(point.move(nextDirection)) == '@'
+                            grid.isRollOfPaper(point.move(nextDirection))
                         }
                         if (adjacent < 4) {
                             grid.remove(point)
@@ -48,7 +46,7 @@ object Day04 {
             }
             continueSearching = removed
         }
-        return grid.getRemovedPapers()
+        return grid.getRollsOfPaperRemoved()
     }
 
 
@@ -64,8 +62,12 @@ object Day04 {
         val rows = values.size
         val columns = values[0].size
 
-        fun getRemovedPapers(): Int {
+        fun getRollsOfPaperRemoved(): Int {
             return removedPapers
+        }
+
+        fun isRollOfPaper(point: Point): Boolean {
+            return getValueAt(point) == '@'
         }
 
         fun getValueAt(point: Point): Char? {
