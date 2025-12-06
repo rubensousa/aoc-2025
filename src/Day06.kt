@@ -39,19 +39,9 @@ object Day06 {
             } else {
                 operationLocations[index + 1].index - 2
             }
-
-            var currentExponent = 0
-            for (row in lines.size - 2 downTo 0) {
-                val matrixValue = numberMatrix[row][endIndex]
-                if (matrixValue != 0) {
-                    runningSum += matrixValue * (10.0.pow(currentExponent)).toLong()
-                    currentExponent++
-                }
-            }
-
-            for (column in endIndex - 1 downTo startIndex) {
+            for (column in endIndex downTo startIndex) {
                 var number = 0L
-                currentExponent = 0
+                var currentExponent = 0
                 for (row in lines.size - 2 downTo 0) {
                     val matrixValue = numberMatrix[row][column]
                     if (matrixValue != 0) {
@@ -59,7 +49,11 @@ object Day06 {
                         currentExponent++
                     }
                 }
-                runningSum = location.operation.apply(number, runningSum)
+                runningSum = if (column == endIndex) {
+                    number
+                } else {
+                    location.operation.apply(number, runningSum)
+                }
             }
             sum += runningSum
         }
