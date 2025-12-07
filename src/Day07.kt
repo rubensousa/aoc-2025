@@ -39,24 +39,22 @@ object Day07 {
         for (row in 1 until grid.rows) {
             for (col in 0 until grid.columns) {
                 val point = Point(x = col, y = row)
-                val topPoint = point.move(Direction.UP)
-                var totalTimelines = 0L
-                if (grid.isSplitter(point)) {
-                    totalTimelines += timelines[topPoint.y][topPoint.x]
-                } else {
+                if (!grid.isSplitter(point)) {
+                    var totalTimelines = 0L
+                    val topPoint = point.move(Direction.UP)
                     val topRightPoint = point.move(Direction.UP_RIGHT)
                     val topLeftPoint = point.move(Direction.UP_LEFT)
                     if (!grid.isSplitter(topPoint)) {
                         totalTimelines += timelines[topPoint.y][topPoint.x]
                     }
                     if (grid.isSplitter(topRightPoint)) {
-                        totalTimelines += timelines[topRightPoint.y][topRightPoint.x]
+                        totalTimelines += timelines[topRightPoint.y - 1][topRightPoint.x]
                     }
                     if (grid.isSplitter(topLeftPoint)) {
-                        totalTimelines += timelines[topLeftPoint.y][topLeftPoint.x]
+                        totalTimelines += timelines[topLeftPoint.y - 1][topLeftPoint.x]
                     }
+                    timelines[row][col] = totalTimelines
                 }
-                timelines[row][col] = totalTimelines
             }
         }
         return timelines.last().sum()
