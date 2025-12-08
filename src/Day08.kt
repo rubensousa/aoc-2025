@@ -1,5 +1,7 @@
+import java.util.PriorityQueue
 import kotlin.math.pow
 import kotlin.math.sqrt
+import kotlin.system.measureTimeMillis
 
 object Day08 {
 
@@ -8,30 +10,29 @@ object Day08 {
         val lines = readText("day08.txt")
         val points = parse(lines)
         part1(points).printObject() // 66640
-        part2(points).printObject() // 78894156
+        part2(points).printObject()  // 78894156
     }
 
     fun part1(points: List<Point3D>): Int {
         val pointCircuits = mutableMapOf<Point3D, Circuit>()
         val outputCircuits = mutableSetOf<Circuit>()
-        buildConnections(points)
-            .take(points.size)
-            .forEach { connection ->
-                val originCircuit = pointCircuits.getOrPut(connection.origin) { Circuit(connection.origin) }
-                pointCircuits[connection.target]?.let { targetCircuit ->
-                    targetCircuit.getPoints().forEach { point ->
-                        pointCircuits[point] = originCircuit
-                        originCircuit.connect(point)
-                    }
+        val connections = buildConnections(points)
+        repeat(points.size) {
+            val connection = connections.poll()
+            val originCircuit = pointCircuits.getOrPut(connection.origin) { Circuit(connection.origin) }
+            pointCircuits[connection.target]?.let { targetCircuit ->
+                targetCircuit.getPoints().forEach { point ->
+                    pointCircuits[point] = originCircuit
+                    originCircuit.connect(point)
                 }
-                originCircuit.connect(connection.target)
-                pointCircuits[connection.target] = originCircuit
-                pointCircuits[connection.origin] = originCircuit
-                outputCircuits.add(originCircuit)
             }
-
+            outputCircuits.remove(originCircuit)
+            originCircuit.connect(connection.target)
+            pointCircuits[connection.target] = originCircuit
+            pointCircuits[connection.origin] = originCircuit
+            outputCircuits.add(originCircuit)
+        }
         val topCircuits = outputCircuits.sortedByDescending { circuit -> circuit.size }
-            .take(3)
         return if (topCircuits.size >= 3) {
             topCircuits[0].size * topCircuits[1].size * topCircuits[2].size
         } else if (topCircuits.size == 2) {
@@ -45,7 +46,9 @@ object Day08 {
 
     fun part2(points: List<Point3D>): Long {
         val pointCircuits = mutableMapOf<Point3D, Circuit>()
-        buildConnections(points).forEach { connection ->
+        val connections = buildConnections(points)
+        while (connections.isNotEmpty()) {
+            val connection = connections.poll()
             val originCircuit = pointCircuits.getOrPut(connection.origin) { Circuit(connection.origin) }
             pointCircuits[connection.target]?.let { targetCircuit ->
                 targetCircuit.getPoints().forEach { point ->
@@ -64,23 +67,22 @@ object Day08 {
         return 0L
     }
 
-    private fun buildConnections(points: List<Point3D>): List<Connection> {
-        val connections = mutableListOf<Connection>()
+    private fun buildConnections(points: List<Point3D>): PriorityQueue<Connection> {
+        val connections = PriorityQueue<Connection>()
         for (i in 0 until points.size - 1) {
             val referencePoint = points[i]
             for (j in i + 1 until points.size) {
                 val targetPoint = points[j]
-                val distance = targetPoint.distanceTo(referencePoint)
-                connections.add(
+                connections.offer(
                     Connection(
                         origin = referencePoint,
                         target = targetPoint,
-                        distance = distance
+                        distance = targetPoint.distanceTo(referencePoint)
                     )
                 )
             }
         }
-        return connections.sortedBy { connection -> connection.distance }
+        return connections
     }
 
     private fun parse(lines: List<String>): List<Point3D> {
@@ -98,7 +100,17 @@ object Day08 {
     }
 
 
-    data class Connection(val origin: Point3D, val target: Point3D, val distance: Long)
+    data class Connection(
+        val origin: Point3D,
+        val target: Point3D,
+        val distance: Long
+    ) : Comparable<Connection> {
+
+        override fun compareTo(other: Connection): Int {
+            return distance.compareTo(other.distance)
+        }
+
+    }
 
     class Circuit(origin: Point3D) {
 
