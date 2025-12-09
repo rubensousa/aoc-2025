@@ -8,13 +8,17 @@ object Day09 {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val lines = readText("day09.txt")
-        val points = lines.map { line ->
+        val points = readPoints("day09.txt")
+        printAndReport { part1(points) } // 4776487744
+        printAndReport { part2(points) } // 1560299548
+    }
+
+    fun readPoints(path: String): List<Point> {
+        val lines = readText(path)
+        return lines.map { line ->
             val values = line.split(",")
             Point(x = values[0].toInt(), y = values[1].toInt())
         }
-        printAndReport { part1(points) } // 4776487744
-        printAndReport { part2(points) } // 2097083020 -> too high
     }
 
     fun part1(points: List<Point>): Long {
@@ -35,145 +39,184 @@ object Day09 {
     }
 
     fun part2(points: List<Point>): Long {
-        val maxX = points.maxOf { it.x }
-        val maxY = points.maxOf { it.y }
-        val verticalBorderLines = mutableMapOf<Int, MutableSet<Rect>>()
-        val horizontalBorderLines = mutableMapOf<Int, MutableSet<Rect>>()
-        val rectQueue = PriorityQueue<Rect>(Collections.reverseOrder())
-        for (i in 0 until points.size - 1) {
-            for (j in i + 1 until points.size) {
-                val currentPoint = points[i]
-                val nextPoint = points[j]
-                val lowestX = min(currentPoint.x, nextPoint.x)
-                val highestX = max(currentPoint.x, nextPoint.x)
-                val lowestY = min(currentPoint.y, nextPoint.y)
-                val highestY = max(currentPoint.y, nextPoint.y)
-                if (currentPoint.y == nextPoint.y) {
-                    val regions = horizontalBorderLines.getOrPut(currentPoint.y) { mutableSetOf() }
-                    regions.add(
-                        Rect(
-                            x1 = lowestX,
-                            x2 = highestX,
-                            y1 = currentPoint.y,
-                            y2 = currentPoint.y
-                        )
-                    )
-                }
-                if (currentPoint.x == nextPoint.x) {
-                    val regions = verticalBorderLines.getOrPut(currentPoint.x) { mutableSetOf() }
-                    regions.add(
-                        Rect(
-                            x1 = currentPoint.x,
-                            x2 = currentPoint.x,
-                            y1 = lowestY,
-                            y2 = highestY
-                        )
-                    )
-                }
-                rectQueue.add(
-                    Rect(
-                        x1 = lowestX,
-                        x2 = highestX,
-                        y1 = lowestY,
-                        y2 = highestY
-                    )
+        // The input size hints at this: we don't really need to use the real size points
+        val scaledGrid = scaleGrid(points)
+        val grid = GridState(scaledGrid.scaledPoints)
+        grid.fill()
+        val scaledRectanglesWithinPath = grid.getRectanglesWithinPath()
+        val originalRectanglesWithinPath = scaledRectanglesWithinPath.map { rect ->
+            scaledGrid.revertScale(rect)
+        }
+        return originalRectanglesWithinPath.maxOf { rect -> rect.getArea() }
+    }
+
+    fun scaleGrid(points: List<Point>): ScaledGrid {
+        val xScaledCoordinates = mutableMapOf<Int, Int>()
+        val xOriginalCoordinates = mutableMapOf<Int, Int>()
+        val yScaledCoordinates = mutableMapOf<Int, Int>()
+        val yOriginalCoordinates = mutableMapOf<Int, Int>()
+        points.sortedBy { it.x }
+            .distinctBy { it.x }
+            .forEachIndexed { index, point ->
+                xScaledCoordinates[point.x] = index
+                xOriginalCoordinates[index] = point.x
+            }
+        points.sortedBy { it.y }
+            .distinctBy { it.y }
+            .forEachIndexed { index, point ->
+                yScaledCoordinates[point.y] = index
+                yOriginalCoordinates[index] = point.y
+            }
+        return ScaledGrid(
+            originalPoints = points,
+            scaledPoints = points.map { point ->
+                Point(
+                    x = xScaledCoordinates[point.x]!!,
+                    y = yScaledCoordinates[point.y]!!
                 )
-            }
-        }
-        val currentPoint = points.last()
-        val nextPoint = points[0]
-        val rect = Rect(
-            x1 = min(currentPoint.x, nextPoint.x),
-            x2 = max(currentPoint.x, nextPoint.x),
-            y1 = min(currentPoint.y, nextPoint.y),
-            y2 = max(currentPoint.y, nextPoint.y)
+            },
+            xCoordinates = xOriginalCoordinates,
+            yCoordinates = yOriginalCoordinates
         )
-        if (currentPoint.y == nextPoint.y) {
-            val regions = horizontalBorderLines.getOrPut(currentPoint.y) { mutableSetOf() }
-            regions.add(rect)
-        } else {
-            val regions = verticalBorderLines.getOrPut(currentPoint.x) { mutableSetOf() }
-            regions.add(rect)
-        }
-        while (rectQueue.isNotEmpty()) {
-            val rect = rectQueue.poll()
-            if (isWithinBorder(rect, verticalBorderLines, horizontalBorderLines)) {
-                return rect.getArea()
-            }
-        }
-        return 0L
     }
 
-    private fun isWithinBorder(
-        rect: Rect,
-        verticalBorderLines: Map<Int, Set<Rect>>,
-        horizontalBorderLines: Map<Int, Set<Rect>>,
-    ): Boolean {
-        for (col in rect.x1 until rect.x2) {
-            val hasBlockingBorders = verticalBorderLines[col].orEmpty()
-                .any { border ->
-                    rect.y1 in border.y1..border.y2
-                            && border.y2 > rect.y1
-                }
-            if (hasBlockingBorders) {
-                return false
-            }
+    data class ScaledGrid(
+        val originalPoints: List<Point>,
+        val scaledPoints: List<Point>,
+        val xCoordinates: Map<Int, Int>,
+        val yCoordinates: Map<Int, Int>
+    ) {
+
+        fun revertScale(rect: Rect): Rect {
+            return Rect(
+                x1 = xCoordinates[rect.x1]!!,
+                y1 = yCoordinates[rect.y1]!!,
+                x2 = xCoordinates[rect.x2]!!,
+                y2 = yCoordinates[rect.y2]!!
+            )
         }
-        for (row in rect.y1 until rect.y2) {
-            val hasBlockingBorders = horizontalBorderLines[row].orEmpty()
-                .any { border ->
-                    rect.x2 in border.x1..border.x2
-                            && border.x2 > rect.x2
-                }
-            if (hasBlockingBorders) {
-                return false
-            }
-        }
-        for (col in rect.x2 downTo rect.x1 + 1) {
-            val hasBlockingBorders = verticalBorderLines[col].orEmpty()
-                .any { border ->
-                    rect.y2 in border.y1..border.y2
-                            && border.y2 > rect.y2
-                }
-            if (hasBlockingBorders) {
-                return false
-            }
-        }
-        for (row in rect.y2 downTo rect.y1 + 1) {
-            val hasBlockingBorders = horizontalBorderLines[row].orEmpty()
-                .any { border ->
-                    rect.x1 in border.x1..border.x2
-                            && border.x1 < rect.x1
-                }
-            if (hasBlockingBorders) {
-                return false
-            }
-        }
-        return true
+
     }
 
-    data class Rect(
-        val x1: Int,
-        val x2: Int,
-        val y1: Int,
-        val y2: Int
-    ) : Comparable<Rect> {
+    class GridState(
+        private val points: List<Point>
+    ) {
 
-        fun contains(point: Point): Boolean {
-            return point.x in x1..x2
-                    && point.y in y1..y2
+        private val tileChar = '#'
+        private val rows = points.maxOf { it.y } + 1
+        private val columns = points.maxOf { it.x } + 1
+        private val cells = MutableList(rows) { row ->
+            MutableList(columns) { col ->
+                if (points.contains(Point(col, row))) {
+                    tileChar
+                } else {
+                    '.'
+                }
+            }
         }
 
-        fun getArea(): Long {
-            val width = abs(x1 - x2).toLong() + 1
-            val height = abs(y1 - y2).toLong() + 1
-            return width * height
+        fun fill() {
+            for (i in 0 until points.size) {
+                val currentPoint = points[i]
+                val nextPoint = if (i == points.size - 1) {
+                    points[0]
+                } else {
+                    points[i + 1]
+                }
+                fillBorder(currentPoint, nextPoint)
+            }
+            val directions = listOf(Direction.LEFT, Direction.UP, Direction.RIGHT, Direction.DOWN)
+            for (row in 0 until rows) {
+                for (col in 0 until columns) {
+                    if (cells[row][col] == tileChar) {
+                        continue
+                    }
+                    val point = Point(x = col, y = row)
+                    var matches = 0
+                    directions.forEach { direction ->
+                        var currentPoint = point
+                        while (currentPoint.y in 0..<rows && currentPoint.x in 0..<columns) {
+                            currentPoint = currentPoint.move(direction)
+                            if (isPartOfPath(row = currentPoint.y, col = currentPoint.x)) {
+                                matches++
+                                break
+                            }
+                        }
+                    }
+                    if (matches == directions.size) {
+                        fillPoint(point)
+                    }
+                }
+            }
         }
 
-        override fun compareTo(other: Rect): Int {
-            return getArea().compareTo(other.getArea())
+        fun getRectanglesWithinPath(): List<Rect> {
+            val output = mutableListOf<Rect>()
+            for (i in 0 until points.size - 1) {
+                for (j in i + 1 until points.size) {
+                    val firstCorner = points[i]
+                    val secondCorner = points[j]
+                    val x1 = min(firstCorner.x, secondCorner.x)
+                    val x2 = max(firstCorner.x, secondCorner.x)
+                    val y1 = min(firstCorner.y, secondCorner.y)
+                    val y2 = max(firstCorner.y, secondCorner.y)
+                    var valid = true
+                    for (row in y1..y2) {
+                        for (col in x1..x2) {
+                            if (!isPartOfPath(row = row, col = col)) {
+                                valid = false
+                            }
+                        }
+                    }
+                    if (valid) {
+                        output.add(Rect(x1 = x1, x2 = x2, y1 = y1, y2 = y2))
+                    }
+                }
+            }
+            return output
         }
 
+        private fun fillPoint(point: Point) {
+            cells[point.y][point.x] = tileChar
+        }
+
+        private fun isPartOfPath(row: Int, col: Int): Boolean {
+            if (row !in 0..<rows) {
+                return false
+            }
+            if (col !in 0..<columns) {
+                return false
+            }
+            return cells[row][col] == tileChar
+        }
+
+        private fun fillBorder(currentPoint: Point, nextPoint: Point) {
+            val startX = min(currentPoint.x, nextPoint.x)
+            val endX = max(currentPoint.x, nextPoint.x)
+            val startY = min(currentPoint.y, nextPoint.y)
+            val endY = max(currentPoint.y, nextPoint.y)
+            if (startX == endX) {
+                for (row in startY until endY + 1) {
+                    cells[row][startX] = tileChar
+                }
+            } else {
+                for (col in startX until endX + 1) {
+                    cells[startY][col] = tileChar
+                }
+            }
+        }
+
+        override fun toString(): String {
+            val stringBuilder = StringBuilder()
+            cells.forEach { row ->
+                row.forEach { value ->
+                    stringBuilder.append(value)
+                }
+                stringBuilder.appendLine()
+            }
+
+            return stringBuilder.toString()
+        }
     }
 
 }
