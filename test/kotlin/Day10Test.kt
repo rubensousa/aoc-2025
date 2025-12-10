@@ -63,20 +63,21 @@ class Day10Test {
     fun `example case part2`() {
         val line = "[.##.] (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}"
         val machine = Day10.parseMachine(line)
-        assertThat(Day10.part2BruteForce(machine)).isEqualTo(10)
+        assertThat(Day10.part2(machine)).isEqualTo(10)
     }
 
     @Test
     fun `example case 2 part2`() {
         val line = "[...#.] (0,2,3,4) (2,3) (0,4) (0,1,2) (1,2,3,4) {7,5,12,7,2}"
         val machine = Day10.parseMachine(line)
-        assertThat(Day10.part2BruteForce(machine)).isEqualTo(12)
+        assertThat(Day10.part2(machine)).isEqualTo(12)
     }
 
     @Test
     fun `example case 3 part2`() {
         val line = "[.###.#] (0,1,2,3,4) (0,3,4) (0,1,2,4,5) (1,2) {10,11,11,5,10,5}"
         val machine = Day10.parseMachine(line)
-        assertThat(Day10.part2BruteForce(machine)).isEqualTo(11)
+        assertThat(Day10.part2(machine)).isEqualTo(11)
     }
+
 }

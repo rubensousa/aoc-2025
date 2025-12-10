@@ -1,22 +1,30 @@
+import com.microsoft.z3.Context
+import com.microsoft.z3.IntNum
+
 object Day10 {
 
     @JvmStatic
     fun main(args: Array<String>) {
         val machines = readText("day10.txt").map { parseMachine(it) }
-        part1(machines).printObject()
-        part2(machines).printObject()
+        printAndReport { part1(machines) }
+        printAndReport { part2(machines) }
     }
 
-    fun part1(machines: List<Machine>): Long {
+    fun part1(machines: List<Machine>): Int {
         return machines.sumOf { machine ->
             part1(machine)
         }
     }
 
-    fun part1(machine: Machine): Long {
-        val stack = ArrayDeque<MachineLightState>()
+    data class MachineState(
+        val lights: List<Boolean>,
+        val buttonPresses: Int,
+    )
+
+    fun part1(machine: Machine): Int {
+        val stack = ArrayDeque<MachineState>()
         stack.addFirst(
-            MachineLightState(
+            MachineState(
                 lights = List(machine.lightDiagram.size) { false },
                 buttonPresses = 0
             )
@@ -26,7 +34,7 @@ object Day10 {
             machine.buttons.forEach { button ->
                 val newLights = toggleLights(machineState.lights, button)
                 if (newLights == machine.lightDiagram) {
-                    return machineState.buttonPresses + 1L
+                    return machineState.buttonPresses + 1
                 }
                 stack.addLast(
                     machineState.copy(
@@ -36,7 +44,7 @@ object Day10 {
                 )
             }
         }
-        return 0L
+        return 0
     }
 
     fun toggleLights(lights: List<Boolean>, button: Set<Int>): List<Boolean> {
@@ -49,74 +57,71 @@ object Day10 {
         }
     }
 
-    fun part2(machines: List<Machine>): Long {
+    fun part2(machines: List<Machine>): Int {
         return machines.sumOf { machine ->
-            println("Processing machine: $machine")
-            part2BruteForce(machine)
+            part2(machine)
         }
     }
 
-    fun part2BruteForce(machine: Machine): Long {
-        val stack = ArrayDeque<MachineCounterState>()
-        val visitedButtons = mutableSetOf<Map<Int, Int>>()
-        val targetCounter = List(machine.joltage.size) { 0 }
-        stack.addFirst(
-            MachineCounterState(
-                counters = machine.joltage,
-                buttonPresses = emptyMap()
-            )
-        )
-        while (stack.isNotEmpty()) {
-            val machineState = stack.removeFirst()
-            for (i in machine.buttons.indices) {
-                val button = machine.buttons[i]
-                val newCounters = decrementCounters(machineState.counters, button) ?: continue
-                if (newCounters == targetCounter) {
-                    return machineState.totalButtonPresses() + 1L
-                }
-                val newButtons = machineState.buttonPresses.toMutableMap()
-                val total = newButtons.getOrPut(i) { 0 }
-                newButtons[i] = total + 1
-                if (!visitedButtons.contains(newButtons)) {
-                    visitedButtons.add(newButtons)
-                    stack.addLast(
-                        machineState.copy(
-                            counters = newCounters,
-                            buttonPresses = newButtons
-                        )
-                    )
-                }
+    /**
+     * Linear system of equations
+     * Example:
+     * - Buttons: (3) (1, 3) (2)
+     * - Matrix:
+     * ```
+     * 0 0 0
+     * 0 1 0
+     * 0 0 1
+     * 1 1 0
+     * ```
+     * If joltage is: (3, 5, 4, 7), then:
+     *
+     * ```
+     * x1 * (0, 0, 0, 1) + x2 * (0, 1, 0, 1) + x3 * (0, 0, 1, 0) = (3, 5, 4, 7)
+     * ```
+     * We want to minimize x1, x2 and x3, but since there's N solutions, this is non-trivial to calculate manually.
+     * I used microsoft Z3 bindings that solves the system
+     */
+    fun part2(machine: Machine): Int = Context().use { context ->
+        /**
+         * First step: create the button variables that are part of the system
+         */
+        val optimizeContext = context.mkOptimize()
+        val startValue = context.mkInt(0)
+        val buttonReferences = machine.buttons.indices
+            .map { context.mkIntConst("b$it") }
+            .toTypedArray()
+        buttonReferences.forEach { buttonReference ->
+            optimizeContext.Add(context.mkGe(buttonReference, startValue))
+        }
+
+        /**
+         * Second step: assign button references for each joltage
+         * and create a function that sums them to the target value
+         */
+        machine.joltage.forEachIndexed { index, value ->
+            val joltageButtons = machine.buttons.mapIndexedNotNull { buttonIndex, button ->
+                if (button.contains(index)) buttonIndex else null
             }
-        }
-        return 0L
-    }
-
-    fun decrementCounters(counters: List<Int>, button: Set<Int>): List<Int>? {
-        val output = counters.toMutableList()
-        button.forEach { index ->
-            val newValue = output[index] - 1
-            if (newValue < 0) {
-                return null
-            }
-            output[index] = newValue
-        }
-        return output
-    }
-
-    data class MachineLightState(
-        val lights: List<Boolean>,
-        val buttonPresses: Int,
-    )
-
-    data class MachineCounterState(
-        val counters: List<Int>,
-        val buttonPresses: Map<Int, Int>,
-    ) {
-
-        fun totalButtonPresses(): Long {
-            return buttonPresses.values.sumOf { it.toLong() }
+            val joltageButtonReferences = joltageButtons.map { buttonIndex ->
+                buttonReferences[buttonIndex]
+            }.toTypedArray()
+            val target = context.mkInt(value)
+            val sumOfPresses = context.mkAdd(*joltageButtonReferences)
+            optimizeContext.Add(context.mkEq(sumOfPresses, target))
         }
 
+        /**
+         * Third step: define number of presses to be the minimum sum of all button values
+         * and then calculate the model
+         */
+        val buttonPresses = context.mkIntConst("presses")
+        optimizeContext.Add(context.mkEq(buttonPresses, context.mkAdd(*buttonReferences)))
+        optimizeContext.MkMinimize(buttonPresses)
+        optimizeContext.Check()
+        val problemModel = optimizeContext.model
+        val output = problemModel.evaluate(buttonPresses, true)
+        return (output as? IntNum)?.int ?: 0
     }
 
     fun parseMachine(line: String): Machine {

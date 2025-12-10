@@ -18,6 +18,7 @@ tasks {
 }
 
 dependencies {
+    implementation("tools.aqua:z3-turnkey:4.14.1")
     testImplementation(kotlin("test"))
     testImplementation("com.google.truth:truth:1.4.4")
 }
