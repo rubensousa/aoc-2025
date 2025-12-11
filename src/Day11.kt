@@ -3,7 +3,7 @@ object Day11 {
     @JvmStatic
     fun main(args: Array<String>) {
         val lines = readText("day11.txt")
-        val nodes = mutableMapOf<String, Node>()
+        val nodes = mutableMapOf<String, Set<String>>()
         lines.forEach { line ->
             parse(line, nodes)
         }
@@ -11,7 +11,7 @@ object Day11 {
         printAndReport { part2(nodes) } // 479511112939968
     }
 
-    fun part1(nodes: Map<String, Node>): Long {
+    fun part1(nodes: Map<String, Set<String>>): Long {
         return getNumberOfPaths(
             nodes = nodes,
             startId = "you",
@@ -19,7 +19,7 @@ object Day11 {
         )
     }
 
-    fun part2(nodes: Map<String, Node>): Long {
+    fun part2(nodes: Map<String, Set<String>>): Long {
         val svrFft = getNumberOfPaths(nodes = nodes, startId = "svr", endId = "fft")
         val fftDac = getNumberOfPaths(nodes = nodes, startId = "fft", endId = "dac")
         val dacOut = getNumberOfPaths(nodes = nodes, startId = "dac", endId = "out")
@@ -30,26 +30,25 @@ object Day11 {
     }
 
     fun getNumberOfPaths(
-        nodes: Map<String, Node>,
+        nodes: Map<String, Set<String>>,
         startId: String,
         endId: String,
     ): Long {
-        val start = nodes[startId] ?: return 0
-        val end = nodes[endId] ?: return 0
-        val stack = ArrayDeque<Node>()
+        val stack = ArrayDeque<String>()
         val visits = mutableMapOf<String, Long>()
-        stack.addFirst(start)
+        stack.addFirst(startId)
         visits[startId] = 1
         while (stack.isNotEmpty()) {
             val currentNode = stack.removeFirst()
-            if (currentNode.key == end.key) {
+            if (currentNode == endId) {
                 continue
             }
-            val runningVisits = visits.remove(currentNode.key) ?: continue
-            currentNode.getNodes().forEach { nextNode ->
-                val nextNodeCurrentVisits = visits.getOrDefault(nextNode.key, 0L)
-                visits[nextNode.key] = nextNodeCurrentVisits + runningVisits
-                if (nextNodeCurrentVisits == 0L) {
+            val parentNodeVisits = visits.remove(currentNode) ?: continue
+            val childNodes = nodes[currentNode] ?: continue
+            childNodes.forEach { nextNode ->
+                val childNodeVisits = visits.getOrDefault(nextNode, 0L)
+                visits[nextNode] = childNodeVisits + parentNodeVisits
+                if (childNodeVisits == 0L) {
                     stack.addLast(nextNode)
                 }
             }
@@ -57,49 +56,11 @@ object Day11 {
         return visits[endId] ?: 0L
     }
 
-    data class NodeConnection(
-        val from: Node,
-        val to: Set<Node>
-    )
-
-    data class Node(
-        val index: Int,
-        val key: String
-    ) {
-
-        private val out = mutableSetOf<Node>()
-
-        fun add(node: Node) {
-            out.add(node)
-        }
-
-        fun getNodes(): Set<Node> = out
-
-    }
-
-    private fun parse(input: String, availableNodes: MutableMap<String, Node>) {
+    private fun parse(input: String, availableNodes: MutableMap<String, Set<String>>) {
         val separatorIndex = input.indexOf(":")
         val firstNodeId = input.take(separatorIndex)
         val remainingNodeIds = input.substring(separatorIndex + 2, input.length).split(" ")
-        val connection = NodeConnection(
-            from = availableNodes.getOrPut(firstNodeId) {
-                Node(
-                    index = availableNodes.size,
-                    key = firstNodeId
-                )
-            },
-            to = remainingNodeIds.map { id ->
-                availableNodes.getOrPut(id) {
-                    Node(
-                        index = availableNodes.size,
-                        key = id
-                    )
-                }
-            }.toSet()
-        )
-        connection.to.forEach { node ->
-            connection.from.add(node)
-        }
+        availableNodes[firstNodeId] = remainingNodeIds.toSet()
     }
 
 }

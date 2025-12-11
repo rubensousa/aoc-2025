@@ -3,7 +3,7 @@ import kotlin.test.Test
 
 class Day11Test {
 
-    private val nodes = mutableMapOf<String, Day11.Node>()
+    private val nodes = mutableMapOf<String, Set<String>>()
 
     @Test
     fun `test case part 2`() {
@@ -27,17 +27,24 @@ class Day11Test {
         ).isEqualTo(2)
     }
 
-    private fun connect(id: String, ids: Set<String>) {
-        val node = getNode(id)
-        nodes[id] = node
-        ids.forEach { id ->
-            val child = getNode(id)
-            node.add(child)
-        }
+    @Test
+    fun `edge case part 1`() {
+        connect("i", setOf("a", "b", "c", "d"))
+        connect("a", setOf("o"))
+        connect("b", setOf("a"))
+        connect("c", setOf("b"))
+        connect("d", setOf("c"))
+        assertThat(
+            Day11.getNumberOfPaths(
+                nodes = nodes,
+                startId = "i",
+                endId = "o"
+            )
+        ).isEqualTo(4)
     }
 
-    private fun getNode(id: String): Day11.Node {
-        return nodes.getOrPut(id) { Day11.Node(index = nodes.size, key = id) }
+    private fun connect(id: String, ids: Set<String>) {
+        nodes[id] = ids
     }
 
 
